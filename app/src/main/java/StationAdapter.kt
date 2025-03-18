@@ -33,7 +33,7 @@ class StationAdapter(
         fun bind(station: Station) {
             name.text = station.name
             Glide.with(thumbnail.context)
-                .load(station.imageUrl)
+                .load(station.imageResId)
                 .thumbnail(0.25f) // Load a smaller thumbnail first for smoother scrolling
                 .diskCacheStrategy(DiskCacheStrategy.ALL) // Cache both original and resized images
                 .override(60, 60) // Resize to match the ImageView size (60dp)

@@ -99,19 +99,19 @@ class PlayerActivity : AppCompatActivity() {
 
         // Load current station image
         Glide.with(this)
-            .load(station.imageUrl)
+            .load(station.imageResId)
             .into(findViewById(R.id.current_station_image))
 
         // Update previous station image
         val prevIndex = if (currentStationIndex > 0) currentStationIndex - 1 else stations.size - 1
         Glide.with(this)
-            .load(stations[prevIndex].imageUrl)
+            .load(stations[prevIndex].imageResId)
             .into(findViewById(R.id.prev_station_image))
 
         // Update next station image
         val nextIndex = if (currentStationIndex < stations.size - 1) currentStationIndex + 1 else 0
         Glide.with(this)
-            .load(stations[nextIndex].imageUrl)
+            .load(stations[nextIndex].imageResId)
             .into(findViewById(R.id.next_station_image))
     }
 
