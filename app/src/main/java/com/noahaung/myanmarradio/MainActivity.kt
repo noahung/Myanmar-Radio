@@ -57,12 +57,12 @@ class MainActivity : AppCompatActivity() {
         val recyclerView = findViewById<RecyclerView>(R.id.station_list)
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = StationAdapter(stations) { station ->
+            val index = stations.indexOf(station)
             val intent = Intent(this, PlayerActivity::class.java).apply {
-                putExtra("STATION_NAME", station.name)
-                putExtra("STATION_URL", station.streamUrl)
-                putExtra("STATION_IMAGE", station.imageUrl)
+                putExtra("STATION_INDEX", index)
+                putExtra("STATION_LIST", ArrayList(stations)) // Use ArrayList for serialization
             }
             startActivity(intent)
         }
-    } // Ensure this closing brace is present
+    }
 }

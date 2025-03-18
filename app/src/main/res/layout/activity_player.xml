@@ -24,70 +24,59 @@
         android:layout_centerHorizontal="true"
         android:layout_marginTop="50dp"/>
 
+    <!-- Waveform visualizer (placeholder) -->
+    <ImageView
+        android:id="@+id/waveform"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_below="@id/station_name"
+        android:layout_marginTop="32dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:src="@drawable/waveform_placeholder"
+        android:tint="#1DB954"
+        android:scaleType="centerInside"/>
+
     <!-- Playback controls -->
     <LinearLayout
-        android:id="@+id/playback_controls"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="32dp"
         android:orientation="horizontal"
-        android:layout_centerInParent="true"
+        android:gravity="center"
         android:padding="16dp">
 
         <ImageButton
-            android:id="@+id/back_button"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@drawable/ic_arrow_back"
+            android:id="@+id/prev_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_prev"
             android:background="@drawable/rounded_button_background"
             android:tint="#FFFFFF"
             android:scaleType="centerInside"
-            android:layout_marginEnd="16dp"
-            android:contentDescription="Back"/>
+            android:layout_marginEnd="32dp"
+            android:contentDescription="Previous Station"/>
 
         <ImageButton
             android:id="@+id/play_pause_button"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
             android:src="@drawable/ic_play_arrow"
             android:background="@drawable/rounded_button_background"
             android:tint="#FFFFFF"
             android:scaleType="centerInside"
-            android:layout_marginEnd="16dp"
+            android:layout_marginEnd="32dp"
             android:contentDescription="Play/Pause"/>
 
         <ImageButton
-            android:id="@+id/stop_button"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@drawable/ic_stop"
+            android:id="@+id/next_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_next"
             android:background="@drawable/rounded_button_background"
             android:tint="#FFFFFF"
             android:scaleType="centerInside"
-            android:contentDescription="Stop"/>
-    </LinearLayout>
-
-    <!-- Volume control -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/playback_controls"
-        android:layout_marginTop="16dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:orientation="vertical">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Volume"
-            android:textSize="16sp"
-            android:textColor="#B3B3B3"/>
-
-        <SeekBar
-            android:id="@+id/volume_control"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:progressTint="#1DB954"
-            android:thumbTint="#1DB954"/>
+            android:contentDescription="Next Station"/>
     </LinearLayout>
 </RelativeLayout>

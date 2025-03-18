@@ -1,6 +1,6 @@
 plugins {
     id("com.android.application")
-    id("kotlin-android")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -16,9 +16,15 @@ android {
     }
 
     buildTypes {
-        getByName("release") {
+        debug {
+            isDebuggable = true // Correct way to set debuggable in Kotlin DSL
+        }
+        release {
             isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 
@@ -37,9 +43,10 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
-    implementation("com.google.android.exoplayer:exoplayer:2.19.1")
-    implementation("com.squareup.picasso:picasso:2.71828")
+    implementation("androidx.media3:media3-exoplayer:1.3.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.3.1")
+    implementation("com.github.bumptech.glide:glide:4.15.1")
     implementation("androidx.cardview:cardview:1.0.0")
-    testImplementation("junit:junit:4.13.2") // Add this line for unit tests
-
+    implementation("com.jakewharton.timber:timber:5.0.1")
+    testImplementation("junit:junit:4.13.2")
 }

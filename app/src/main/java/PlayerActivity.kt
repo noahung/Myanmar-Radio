@@ -1,52 +1,75 @@
 package com.noahaung.myanmarradio
 
-import android.content.Context
-import android.media.AudioManager
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.MediaItem
-import com.google.android.exoplayer2.source.ProgressiveMediaSource
-import com.google.android.exoplayer2.upstream.DefaultDataSource
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import android.util.Log
 import android.widget.ImageButton
-import android.widget.SeekBar
 import android.widget.TextView
-import com.squareup.picasso.Picasso
+import com.bumptech.glide.Glide
 import android.widget.ImageView
+import timber.log.Timber
 
 class PlayerActivity : AppCompatActivity() {
     private lateinit var player: ExoPlayer
     private var isPlaying = false
-    private lateinit var audioManager: AudioManager
     private lateinit var playPauseButton: ImageButton
+    private lateinit var stations: List<Station>
+    private var currentStationIndex: Int = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
 
-        // Initialize AudioManager for volume control
-        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-        val name = intent.getStringExtra("STATION_NAME") ?: "Unknown"
-        val url = intent.getStringExtra("STATION_URL") ?: ""
-        val imageUrl = intent.getStringExtra("STATION_IMAGE") ?: ""
+
+        // Get the station list and current index from the intent
+        currentStationIndex = intent.getIntExtra("STATION_INDEX", 0)
+        @Suppress("DEPRECATION")
+        val serializableStations = intent.getSerializableExtra("STATION_LIST")
+        stations = serializableStations as? List<Station>
+            ?: throw IllegalStateException("Station list not found in intent")
+
+        val currentStation = stations[currentStationIndex]
+        val name = currentStation.name
+        val url = currentStation.streamUrl
+        val imageUrl = currentStation.imageUrl
 
         findViewById<TextView>(R.id.station_name).text = name
         playPauseButton = findViewById<ImageButton>(R.id.play_pause_button)
-        val stopButton = findViewById<ImageButton>(R.id.stop_button)
-        val backButton = findViewById<ImageButton>(R.id.back_button)
-        val volumeControl = findViewById<SeekBar>(R.id.volume_control)
+        val prevButton = findViewById<ImageButton>(R.id.prev_button)
+        val nextButton = findViewById<ImageButton>(R.id.next_button)
         val background = findViewById<ImageView>(R.id.station_background)
 
-        Picasso.get().load(imageUrl).into(background)
+        Glide.with(background.context)
+            .load(imageUrl)
+            .into(background)
 
-        // Initialize ExoPlayer
-        player = ExoPlayer.Builder(this).build()
+        // Initialize ExoPlayer without custom User-Agent
         val dataSourceFactory = DefaultDataSource.Factory(this)
-        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
-            .createMediaSource(MediaItem.fromUri(url))
-        player.setMediaSource(mediaSource)
-        player.prepare()
+        player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .build()
+        player.addListener(object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                Timber.e("Playback error: ${error.message}")
+                Log.e("PlayerActivity", "Playback error: ${error.message}", error)
+            }
+        })
+
+        try {
+            val mediaItem = MediaItem.fromUri(url)
+            player.setMediaItem(mediaItem)
+            player.prepare()
+        } catch (e: Exception) {
+            Timber.e("Failed to prepare media source: ${e.message}")
+            Log.e("PlayerActivity", "Failed to prepare media source: ${e.message}", e)
+        }
 
         // Play/Pause button
         playPauseButton.setOnClickListener {
@@ -60,34 +83,42 @@ class PlayerActivity : AppCompatActivity() {
             isPlaying = !isPlaying
         }
 
-        // Stop button
-        stopButton.setOnClickListener {
-            if (isPlaying) {
-                player.stop()
-                playPauseButton.setImageResource(R.drawable.ic_play_arrow)
-                isPlaying = false
+        // Previous button
+        prevButton.setOnClickListener {
+            if (currentStationIndex > 0) {
+                currentStationIndex--
+                switchStation()
             }
         }
 
-        // Back button
-        backButton.setOnClickListener { finish() }
-
-        // Volume control
-        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        volumeControl.max = maxVolume
-        volumeControl.progress = currentVolume
-
-        volumeControl.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, progress, 0)
-                }
+        // Next button
+        nextButton.setOnClickListener {
+            if (currentStationIndex < stations.size - 1) {
+                currentStationIndex++
+                switchStation()
             }
+        }
+    }
 
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
+    private fun switchStation() {
+        val station = stations[currentStationIndex]
+        findViewById<TextView>(R.id.station_name).text = station.name
+        Glide.with(this)
+            .load(station.imageUrl)
+            .into(findViewById<ImageView>(R.id.station_background))
+
+        // Update the media source for the new station
+        try {
+            val mediaItem = MediaItem.fromUri(station.streamUrl)
+            player.setMediaItem(mediaItem)
+            player.prepare()
+            if (isPlaying) {
+                player.play()
+            }
+        } catch (e: Exception) {
+            Timber.e("Failed to switch station: ${e.message}")
+            Log.e("PlayerActivity", "Failed to switch station: ${e.message}", e)
+        }
     }
 
     override fun onDestroy() {
