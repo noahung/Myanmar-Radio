@@ -12,7 +12,6 @@ import android.util.Log
 import android.widget.ImageButton
 import android.widget.TextView
 import com.bumptech.glide.Glide
-import android.widget.ImageView
 import timber.log.Timber
 
 class PlayerActivity : AppCompatActivity() {
@@ -26,9 +25,6 @@ class PlayerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
 
-
-
-        // Get the station list and current index from the intent
         currentStationIndex = intent.getIntExtra("STATION_INDEX", 0)
         @Suppress("DEPRECATION")
         val serializableStations = intent.getSerializableExtra("STATION_LIST")
@@ -36,21 +32,18 @@ class PlayerActivity : AppCompatActivity() {
             ?: throw IllegalStateException("Station list not found in intent")
 
         val currentStation = stations[currentStationIndex]
-        val name = currentStation.name
-        val url = currentStation.streamUrl
-        val imageUrl = currentStation.imageUrl
+        updateUI(currentStation)
 
-        findViewById<TextView>(R.id.station_name).text = name
-        playPauseButton = findViewById<ImageButton>(R.id.play_pause_button)
+        playPauseButton = findViewById(R.id.play_pause_button)
         val prevButton = findViewById<ImageButton>(R.id.prev_button)
         val nextButton = findViewById<ImageButton>(R.id.next_button)
-        val background = findViewById<ImageView>(R.id.station_background)
+        val backButton = findViewById<ImageButton>(R.id.back_button)
 
-        Glide.with(background.context)
-            .load(imageUrl)
-            .into(background)
+        // Back button functionality
+        backButton.setOnClickListener {
+            finish()
+        }
 
-        // Initialize ExoPlayer without custom User-Agent
         val dataSourceFactory = DefaultDataSource.Factory(this)
         player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
@@ -63,7 +56,7 @@ class PlayerActivity : AppCompatActivity() {
         })
 
         try {
-            val mediaItem = MediaItem.fromUri(url)
+            val mediaItem = MediaItem.fromUri(currentStation.streamUrl)
             player.setMediaItem(mediaItem)
             player.prepare()
         } catch (e: Exception) {
@@ -71,11 +64,10 @@ class PlayerActivity : AppCompatActivity() {
             Log.e("PlayerActivity", "Failed to prepare media source: ${e.message}", e)
         }
 
-        // Play/Pause button
         playPauseButton.setOnClickListener {
             if (isPlaying) {
                 player.pause()
-                playPauseButton.setImageResource(R.drawable.ic_play_arrow)
+                playPauseButton.setImageResource(R.drawable.ic_play)
             } else {
                 player.play()
                 playPauseButton.setImageResource(R.drawable.ic_pause)
@@ -83,31 +75,48 @@ class PlayerActivity : AppCompatActivity() {
             isPlaying = !isPlaying
         }
 
-        // Previous button
         prevButton.setOnClickListener {
             if (currentStationIndex > 0) {
                 currentStationIndex--
+                updateUI(stations[currentStationIndex])
                 switchStation()
             }
         }
 
-        // Next button
         nextButton.setOnClickListener {
             if (currentStationIndex < stations.size - 1) {
                 currentStationIndex++
+                updateUI(stations[currentStationIndex])
                 switchStation()
             }
         }
     }
 
-    private fun switchStation() {
-        val station = stations[currentStationIndex]
+    private fun updateUI(station: Station) {
+        // Set station name and description
         findViewById<TextView>(R.id.station_name).text = station.name
+        findViewById<TextView>(R.id.station_subtext).text = station.name
+
+        // Load current station image
         Glide.with(this)
             .load(station.imageUrl)
-            .into(findViewById<ImageView>(R.id.station_background))
+            .into(findViewById(R.id.current_station_image))
 
-        // Update the media source for the new station
+        // Update previous station image
+        val prevIndex = if (currentStationIndex > 0) currentStationIndex - 1 else stations.size - 1
+        Glide.with(this)
+            .load(stations[prevIndex].imageUrl)
+            .into(findViewById(R.id.prev_station_image))
+
+        // Update next station image
+        val nextIndex = if (currentStationIndex < stations.size - 1) currentStationIndex + 1 else 0
+        Glide.with(this)
+            .load(stations[nextIndex].imageUrl)
+            .into(findViewById(R.id.next_station_image))
+    }
+
+    private fun switchStation() {
+        val station = stations[currentStationIndex]
         try {
             val mediaItem = MediaItem.fromUri(station.streamUrl)
             player.setMediaItem(mediaItem)
