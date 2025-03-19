@@ -1,17 +1,44 @@
 package com.noahaung.myanmarradio
 
 import android.content.Intent
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import androidx.recyclerview.widget.LinearLayoutManager
+import android.util.Log
+import android.view.View
+import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.media3.common.Player
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 
 class MainActivity : AppCompatActivity() {
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var miniPlayerContainer: View
+    private lateinit var miniPlayerStationName: TextView
+    private lateinit var miniPlayerPlayPause: ImageButton
+    private lateinit var miniPlayerImage: ImageView
+    private lateinit var stations: List<Station> // Store stations for navigation
+
+    private val playerListener = object : Player.Listener {
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            updateMiniPlayer()
+        }
+
+        override fun onPlaybackStateChanged(state: Int) {
+            updateMiniPlayer()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val stations = listOf(
+        // Initialize PlaybackManager
+        PlaybackManager.initialize(this)
+
+        stations = listOf(
             Station("Friends FM", "https://stream-172.zeno.fm/rtt1xsez338uv", R.drawable.friends_fm),
             Station("City FM", "https://stream.zeno.fm/rq4ux25pyeruv", R.drawable.city_fm),
             Station("Shwe Ayeyar FM", "https://stream.zeno.fm/gvyz1utf4uhvv", R.drawable.shwe_ayeyar_fm),
@@ -54,8 +81,9 @@ class MainActivity : AppCompatActivity() {
             Station("Carrot FM", "https://stream-169.zeno.fm/sbhdc0yqkprvv", R.drawable.carrot_fm)
         )
 
-        val recyclerView = findViewById<RecyclerView>(R.id.station_list)
-        recyclerView.layoutManager = LinearLayoutManager(this)
+        recyclerView = findViewById(R.id.station_list)
+        recyclerView.layoutManager = GridLayoutManager(this, 2) // Changed to 2 columns
+        recyclerView.addItemDecoration(GridSpacingItemDecoration(2, 24, true)) // Updated spanCount to 2
         recyclerView.adapter = StationAdapter(stations) { station ->
             val index = stations.indexOf(station)
             val intent = Intent(this, PlayerActivity::class.java).apply {
@@ -63,6 +91,64 @@ class MainActivity : AppCompatActivity() {
                 putExtra("STATION_LIST", ArrayList(stations))
             }
             startActivity(intent)
+        }
+
+        // Initialize mini-player views
+        miniPlayerContainer = findViewById(R.id.mini_player_container)
+        miniPlayerStationName = findViewById(R.id.mini_player_station_name)
+        miniPlayerPlayPause = findViewById(R.id.mini_player_play_pause)
+        miniPlayerImage = findViewById(R.id.mini_player_image)
+
+        // Set up mini-player play/pause button
+        miniPlayerPlayPause.setOnClickListener {
+            if (PlaybackManager.isPlaying()) {
+                PlaybackManager.getPlayer().pause()
+            } else {
+                PlaybackManager.getPlayer().play()
+            }
+        }
+
+        // Navigate to PlayerActivity when mini-player is clicked
+        miniPlayerContainer.setOnClickListener {
+            val currentStation = PlaybackManager.getCurrentStation()
+            if (currentStation != null) {
+                val index = stations.indexOf(currentStation)
+                if (index != -1) {
+                    val intent = Intent(this, PlayerActivity::class.java).apply {
+                        putExtra("STATION_INDEX", index)
+                        putExtra("STATION_LIST", ArrayList(stations))
+                    }
+                    startActivity(intent)
+                }
+            }
+        }
+
+        // Add listener to update mini-player
+        PlaybackManager.addListener(playerListener)
+        updateMiniPlayer()
+    }
+
+    private fun updateMiniPlayer() {
+        val currentStation = PlaybackManager.getCurrentStation()
+        if (currentStation != null) {
+            miniPlayerContainer.visibility = View.VISIBLE
+            miniPlayerStationName.text = currentStation.name
+            Glide.with(this)
+                .load(currentStation.imageResId)
+                .into(miniPlayerImage)
+            miniPlayerPlayPause.setImageResource(
+                if (PlaybackManager.isPlaying()) R.drawable.ic_pause else R.drawable.ic_play
+            )
+        } else {
+            miniPlayerContainer.visibility = View.GONE
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        PlaybackManager.removeListener(playerListener)
+        if (isFinishing) {
+            PlaybackManager.release()
         }
     }
 }

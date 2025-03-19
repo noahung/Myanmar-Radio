@@ -6,7 +6,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.View
-import kotlin.math.sin
+import kotlin.random.Random
 
 class SoundWaveView @JvmOverloads constructor(
     context: Context,
@@ -18,41 +18,46 @@ class SoundWaveView @JvmOverloads constructor(
         color = Color.WHITE
         style = Paint.Style.FILL
     }
-    private val barWidth = 4f
-    private val minSpacing = 2f
-    private val amplitude = 80f
-    private var phase = 0f
+    private val barCount = 20
+    private var barWidth: Float = 0f
+    private var maxAmplitude: Float = 100f
+    private var isPlaying = false
+    private val amplitudes = FloatArray(barCount) { Random.nextFloat() * maxAmplitude }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        barWidth = w.toFloat() / barCount
+        maxAmplitude = h / 2f
+    }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val width = width.toFloat()
-        val height = height.toFloat()
-        val centerY = height / 2
 
-        val totalBarWidth = barWidth + minSpacing
-        val maxBars = (width / totalBarWidth).toInt()
-        val barsToDraw = maxBars.coerceAtLeast(10) // Ensure at least 10 bars
+        val centerY = height / 2f
 
-        for (i in 0 until barsToDraw) {
-            val x = i * totalBarWidth
-            if (x > width) break
+        for (i in 0 until barCount) {
+            val left = i * barWidth
+            val amplitude = if (isPlaying) Random.nextFloat() * maxAmplitude else amplitudes[i] / 2
 
-            val barHeight = amplitude * (sin(phase + i * 0.5f) + 1) / 2
-            val top = centerY - barHeight / 2
-            val bottom = centerY + barHeight / 2
-
-            canvas.drawRect(x, top, x + barWidth, bottom, paint)
+            canvas.drawRect(
+                left,
+                centerY - amplitude,
+                left + barWidth * 0.8f,
+                centerY + amplitude,
+                paint
+            )
         }
 
-        phase += 0.1f
-        invalidate()
+        if (isPlaying) {
+            for (i in amplitudes.indices) {
+                amplitudes[i] = Random.nextFloat() * maxAmplitude
+            }
+            postInvalidateDelayed(100)
+        }
     }
 
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val desiredHeight = (amplitude * 2).toInt()
-        setMeasuredDimension(
-            MeasureSpec.getSize(widthMeasureSpec), // Use full parent width
-            resolveSize(desiredHeight, heightMeasureSpec)
-        )
+    fun setPlaying(playing: Boolean) {
+        isPlaying = playing
+        invalidate()
     }
 }

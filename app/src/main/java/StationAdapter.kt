@@ -1,5 +1,6 @@
 package com.noahaung.myanmarradio
 
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -7,7 +8,6 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
 
 class StationAdapter(
     private val stations: List<Station>,
@@ -15,30 +15,34 @@ class StationAdapter(
 ) : RecyclerView.Adapter<StationAdapter.StationViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): StationViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.station_item, parent, false)
+        Log.d("StationAdapter", "onCreateViewHolder called")
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.station_item, parent, false)
         return StationViewHolder(view)
     }
 
     override fun onBindViewHolder(holder: StationViewHolder, position: Int) {
+        Log.d("StationAdapter", "onBindViewHolder called for position $position")
         val station = stations[position]
         holder.bind(station)
     }
 
-    override fun getItemCount(): Int = stations.size
+    override fun getItemCount(): Int {
+        Log.d("StationAdapter", "getItemCount called: ${stations.size}")
+        return stations.size
+    }
 
     inner class StationViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val thumbnail: ImageView = itemView.findViewById(R.id.station_thumbnail)
-        private val name: TextView = itemView.findViewById(R.id.station_name)
+        private val stationThumbnail: ImageView = itemView.findViewById(R.id.station_thumbnail)
+        private val stationName: TextView = itemView.findViewById(R.id.station_name)
 
         fun bind(station: Station) {
-            name.text = station.name
-            Glide.with(thumbnail.context)
+            Log.d("StationAdapter", "Binding station: ${station.name}")
+            stationName.text = station.name
+            Glide.with(itemView.context)
                 .load(station.imageResId)
-                .thumbnail(0.25f) // Load a smaller thumbnail first for smoother scrolling
-                .diskCacheStrategy(DiskCacheStrategy.ALL) // Cache both original and resized images
-                .override(60, 60) // Resize to match the ImageView size (60dp)
-                .into(thumbnail)
-
+                .placeholder(android.R.color.darker_gray) // Gray placeholder
+                .into(stationThumbnail)
             itemView.setOnClickListener { onStationClick(station) }
         }
     }

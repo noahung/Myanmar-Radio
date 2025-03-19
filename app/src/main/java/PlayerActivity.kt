@@ -1,25 +1,121 @@
 package com.noahaung.myanmarradio
 
 import android.os.Bundle
+import android.view.View
+import android.widget.ImageButton
+import android.widget.ProgressBar
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import android.util.Log
-import android.widget.ImageButton
-import android.widget.TextView
 import com.bumptech.glide.Glide
+import com.google.android.material.snackbar.Snackbar
 import timber.log.Timber
 
 class PlayerActivity : AppCompatActivity() {
     private lateinit var player: ExoPlayer
     private var isPlaying = false
     private lateinit var playPauseButton: ImageButton
+    private lateinit var loadingIndicator: ProgressBar
+    private lateinit var bufferingText: TextView
     private lateinit var stations: List<Station>
     private var currentStationIndex: Int = 0
+    private lateinit var soundWaveView: SoundWaveView
+
+    private val playerListener = object : Player.Listener {
+        override fun onPlayerError(error: PlaybackException) {
+            Timber.e("Playback error: ${error.message}")
+            Log.e("PlayerActivity", "Playback error: ${error.message}", error)
+
+            // Reset UI elements
+            loadingIndicator.visibility = View.GONE
+            bufferingText.visibility = View.GONE
+            soundWaveView.setPlaying(false)
+            isPlaying = false
+            playPauseButton.setImageResource(R.drawable.ic_play)
+
+            // Check if the error is network-related
+            val errorMessage = when {
+                error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+                        error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> {
+                    "Failed to load stream. Please check your network connection."
+                }
+                error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED -> {
+                    "An unexpected error occurred while playing the stream."
+                }
+                else -> {
+                    "An error occurred: ${error.message}"
+                }
+            }
+
+            // Show Snackbar with retry option
+            Snackbar.make(
+                findViewById(R.id.control_layout),
+                errorMessage,
+                Snackbar.LENGTH_LONG
+            ).setAction("Retry") {
+                // Retry loading the current station
+                try {
+                    val mediaItem = MediaItem.fromUri(stations[currentStationIndex].streamUrl)
+                    player.setMediaItem(mediaItem)
+                    player.prepare()
+                    if (isPlaying) {
+                        player.play()
+                    }
+                } catch (e: Exception) {
+                    Timber.e("Retry failed: ${e.message}")
+                    Log.e("PlayerActivity", "Retry failed: ${e.message}", e)
+                }
+            }.show()
+        }
+
+        override fun onPlaybackStateChanged(state: Int) {
+            when (state) {
+                Player.STATE_BUFFERING -> {
+                    loadingIndicator.visibility = View.VISIBLE
+                    bufferingText.visibility = View.VISIBLE
+                    soundWaveView.setPlaying(false) // Pause animation while buffering
+                }
+                Player.STATE_READY -> {
+                    loadingIndicator.visibility = View.GONE
+                    bufferingText.visibility = View.GONE
+                    if (player.playWhenReady) {
+                        isPlaying = true
+                        playPauseButton.setImageResource(R.drawable.ic_pause)
+                        soundWaveView.setPlaying(true)
+                    } else {
+                        isPlaying = false
+                        playPauseButton.setImageResource(R.drawable.ic_play)
+                        soundWaveView.setPlaying(false)
+                    }
+                }
+                Player.STATE_ENDED, Player.STATE_IDLE -> {
+                    loadingIndicator.visibility = View.GONE
+                    bufferingText.visibility = View.GONE
+                    isPlaying = false
+                    playPauseButton.setImageResource(R.drawable.ic_play)
+                    soundWaveView.setPlaying(false)
+                }
+            }
+        }
+
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            if (playWhenReady && player.playbackState == Player.STATE_READY) {
+                isPlaying = true
+                playPauseButton.setImageResource(R.drawable.ic_pause)
+                soundWaveView.setPlaying(true)
+                loadingIndicator.visibility = View.GONE
+                bufferingText.visibility = View.GONE
+            } else {
+                isPlaying = false
+                playPauseButton.setImageResource(R.drawable.ic_play)
+                soundWaveView.setPlaying(false)
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,8 +123,7 @@ class PlayerActivity : AppCompatActivity() {
 
         currentStationIndex = intent.getIntExtra("STATION_INDEX", 0)
         @Suppress("DEPRECATION")
-        val serializableStations = intent.getSerializableExtra("STATION_LIST")
-        stations = serializableStations as? List<Station>
+        stations = intent.getSerializableExtra("STATION_LIST") as? List<Station>
             ?: throw IllegalStateException("Station list not found in intent")
 
         val currentStation = stations[currentStationIndex]
@@ -38,41 +133,38 @@ class PlayerActivity : AppCompatActivity() {
         val prevButton = findViewById<ImageButton>(R.id.prev_button)
         val nextButton = findViewById<ImageButton>(R.id.next_button)
         val backButton = findViewById<ImageButton>(R.id.back_button)
+        soundWaveView = findViewById(R.id.soundwave_view)
+        loadingIndicator = findViewById(R.id.loading_indicator)
+        bufferingText = findViewById(R.id.buffering_text)
 
-        // Back button functionality
         backButton.setOnClickListener {
             finish()
         }
 
-        val dataSourceFactory = DefaultDataSource.Factory(this)
-        player = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
-            .build()
-        player.addListener(object : Player.Listener {
-            override fun onPlayerError(error: PlaybackException) {
-                Timber.e("Playback error: ${error.message}")
-                Log.e("PlayerActivity", "Playback error: ${error.message}", error)
-            }
-        })
+        // Use the shared ExoPlayer instance from PlaybackManager
+        player = PlaybackManager.getPlayer()
+        PlaybackManager.setCurrentStation(currentStation)
+        PlaybackManager.addListener(playerListener)
 
         try {
             val mediaItem = MediaItem.fromUri(currentStation.streamUrl)
             player.setMediaItem(mediaItem)
             player.prepare()
+            player.play() // Auto-play the station when entering PlayerActivity
         } catch (e: Exception) {
             Timber.e("Failed to prepare media source: ${e.message}")
             Log.e("PlayerActivity", "Failed to prepare media source: ${e.message}", e)
+            loadingIndicator.visibility = View.GONE
+            bufferingText.visibility = View.GONE
+            showErrorSnackbar("Failed to prepare stream: ${e.message}")
         }
 
         playPauseButton.setOnClickListener {
             if (isPlaying) {
                 player.pause()
-                playPauseButton.setImageResource(R.drawable.ic_play)
             } else {
                 player.play()
-                playPauseButton.setImageResource(R.drawable.ic_pause)
             }
-            isPlaying = !isPlaying
         }
 
         prevButton.setOnClickListener {
@@ -93,22 +185,18 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun updateUI(station: Station) {
-        // Set station name and description
         findViewById<TextView>(R.id.station_name).text = station.name
         findViewById<TextView>(R.id.station_subtext).text = station.name
 
-        // Load current station image
         Glide.with(this)
             .load(station.imageResId)
             .into(findViewById(R.id.current_station_image))
 
-        // Update previous station image
         val prevIndex = if (currentStationIndex > 0) currentStationIndex - 1 else stations.size - 1
         Glide.with(this)
             .load(stations[prevIndex].imageResId)
             .into(findViewById(R.id.prev_station_image))
 
-        // Update next station image
         val nextIndex = if (currentStationIndex < stations.size - 1) currentStationIndex + 1 else 0
         Glide.with(this)
             .load(stations[nextIndex].imageResId)
@@ -117,6 +205,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun switchStation() {
         val station = stations[currentStationIndex]
+        PlaybackManager.setCurrentStation(station)
         try {
             val mediaItem = MediaItem.fromUri(station.streamUrl)
             player.setMediaItem(mediaItem)
@@ -127,11 +216,36 @@ class PlayerActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Timber.e("Failed to switch station: ${e.message}")
             Log.e("PlayerActivity", "Failed to switch station: ${e.message}", e)
+            loadingIndicator.visibility = View.GONE
+            bufferingText.visibility = View.GONE
+            showErrorSnackbar("Failed to switch station: ${e.message}")
         }
+    }
+
+    private fun showErrorSnackbar(message: String) {
+        Snackbar.make(
+            findViewById(R.id.control_layout),
+            message,
+            Snackbar.LENGTH_LONG
+        ).setAction("Retry") {
+            // Retry loading the current station
+            try {
+                val mediaItem = MediaItem.fromUri(stations[currentStationIndex].streamUrl)
+                player.setMediaItem(mediaItem)
+                player.prepare()
+                if (isPlaying) {
+                    player.play()
+                }
+            } catch (e: Exception) {
+                Timber.e("Retry failed: ${e.message}")
+                Log.e("PlayerActivity", "Retry failed: ${e.message}", e)
+            }
+        }.show()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        player.release()
+        PlaybackManager.removeListener(playerListener)
+        // Do not release the player here, as we want it to persist in MainActivity
     }
 }
