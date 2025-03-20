@@ -89,6 +89,9 @@ class MainActivity : AppCompatActivity() {
             station
         } as ArrayList<Station>
 
+        // Set the stations in PlaybackManager
+        PlaybackManager.setStations(stations)
+
         viewPager = findViewById(R.id.view_pager)
         viewPager.adapter = ViewPagerAdapter(this)
 
@@ -126,8 +129,16 @@ class MainActivity : AppCompatActivity() {
         miniPlayerPlayPause.setOnClickListener {
             if (PlaybackManager.isPlaying()) {
                 PlaybackManager.getPlayer().pause()
+                val intent = Intent(this, PlaybackService::class.java).apply {
+                    action = "PAUSE"
+                }
+                startService(intent)
             } else {
                 PlaybackManager.getPlayer().play()
+                val intent = Intent(this, PlaybackService::class.java).apply {
+                    action = "PLAY"
+                }
+                startService(intent)
             }
         }
 
@@ -169,12 +180,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        Log.d("MainActivity", "onActivityResult called, resultCode: $resultCode")
-        // Refresh the Favorites tab when returning from PlayerActivity
         val fragments = supportFragmentManager.fragments
         fragments.forEach { fragment ->
             if (fragment is StationListFragment) {
-                Log.d("MainActivity", "Refreshing fragment")
+                Log.d("MainActivity", "Refreshing fragment (showFavorites=${fragment.showFavorites})")
                 fragment.refresh()
             }
         }

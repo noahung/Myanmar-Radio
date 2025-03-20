@@ -17,7 +17,7 @@ android {
 
     buildTypes {
         debug {
-            isDebuggable = true // Correct way to set debuggable in Kotlin DSL
+            isDebuggable = true
         }
         release {
             isMinifyEnabled = false
@@ -45,9 +45,12 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("androidx.viewpager2:viewpager2:1.0.0")
-    implementation("androidx.media3:media3-exoplayer:1.3.1")
+    implementation("androidx.media3:media3-exoplayer:1.3.1") // Removed duplicate
     implementation("androidx.media3:media3-exoplayer-hls:1.3.1")
+    implementation("androidx.media3:media3-session:1.3.1")
+    implementation("androidx.media3:media3-ui:1.3.1")
     implementation("com.github.bumptech.glide:glide:4.15.1")
     implementation("com.jakewharton.timber:timber:5.0.1")
     testImplementation("junit:junit:4.13.2")
+    implementation("androidx.media:media:1.7.0")
 }

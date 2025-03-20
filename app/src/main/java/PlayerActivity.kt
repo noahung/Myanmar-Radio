@@ -3,7 +3,6 @@ package com.noahaung.myanmarradio
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -16,7 +15,6 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.bumptech.glide.Glide
 import com.google.android.material.snackbar.Snackbar
-import timber.log.Timber
 
 class PlayerActivity : AppCompatActivity() {
     private lateinit var player: ExoPlayer
@@ -32,9 +30,6 @@ class PlayerActivity : AppCompatActivity() {
 
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            Timber.e("Playback error: ${error.message}")
-            Log.e("PlayerActivity", "Playback error: ${error.message}", error)
-
             loadingIndicator.visibility = View.GONE
             bufferingText.visibility = View.GONE
             soundWaveView.setPlaying(false)
@@ -67,8 +62,11 @@ class PlayerActivity : AppCompatActivity() {
                         player.play()
                     }
                 } catch (e: Exception) {
-                    Timber.e("Retry failed: ${e.message}")
-                    Log.e("PlayerActivity", "Retry failed: ${e.message}", e)
+                    Snackbar.make(
+                        findViewById(R.id.control_layout),
+                        "Retry failed: ${e.message}",
+                        Snackbar.LENGTH_LONG
+                    ).show()
                 }
             }.show()
         }
@@ -124,100 +122,103 @@ class PlayerActivity : AppCompatActivity() {
 
         sharedPreferences = getSharedPreferences("favorites", MODE_PRIVATE)
 
+        currentStationIndex = intent.getIntExtra("STATION_INDEX", 0)
+        @Suppress("DEPRECATION")
+        stations = intent.getSerializableExtra("STATION_LIST") as? ArrayList<Station>
+            ?: throw IllegalStateException("Station list not found in intent")
+
+        if (currentStationIndex < 0 || currentStationIndex >= stations.size) {
+            throw IllegalStateException("Invalid station index: $currentStationIndex")
+        }
+
+        playPauseButton = findViewById(R.id.play_pause_button)
+        val prevButton = findViewById<ImageButton>(R.id.prev_button)
+        val nextButton = findViewById<ImageButton>(R.id.next_button)
+        val backButton = findViewById<ImageButton>(R.id.back_button)
+        soundWaveView = findViewById(R.id.soundwave_view)
+        loadingIndicator = findViewById(R.id.loading_indicator)
+        bufferingText = findViewById(R.id.buffering_text)
+        favoriteIcon = findViewById(R.id.favorite_icon_player)
+
+        val currentStation = stations[currentStationIndex]
+        updateUI(currentStation)
+
+        backButton.setOnClickListener {
+            finish()
+        }
+
+        player = PlaybackManager.getPlayer()
+        PlaybackManager.setCurrentStation(currentStation)
+        PlaybackManager.addListener(playerListener)
+
         try {
-            currentStationIndex = intent.getIntExtra("STATION_INDEX", 0)
-            Log.d("PlayerActivity", "Received STATION_INDEX: $currentStationIndex")
-
-            @Suppress("DEPRECATION")
-            stations = intent.getSerializableExtra("STATION_LIST") as? ArrayList<Station>
-                ?: throw IllegalStateException("Station list not found in intent")
-            Log.d("PlayerActivity", "Received STATION_LIST with size: ${stations.size}")
-
-            if (currentStationIndex < 0 || currentStationIndex >= stations.size) {
-                throw IllegalStateException("Invalid station index: $currentStationIndex")
-            }
-
-            playPauseButton = findViewById(R.id.play_pause_button)
-            val prevButton = findViewById<ImageButton>(R.id.prev_button)
-            val nextButton = findViewById<ImageButton>(R.id.next_button)
-            val backButton = findViewById<ImageButton>(R.id.back_button)
-            soundWaveView = findViewById(R.id.soundwave_view)
-            loadingIndicator = findViewById(R.id.loading_indicator)
-            bufferingText = findViewById(R.id.buffering_text)
-            favoriteIcon = findViewById(R.id.favorite_icon_player)
-
-            val currentStation = stations[currentStationIndex]
-            updateUI(currentStation)
-
-            backButton.setOnClickListener {
-                finish()
-            }
-
-            player = PlaybackManager.getPlayer()
-            PlaybackManager.setCurrentStation(currentStation)
-            PlaybackManager.addListener(playerListener)
-
-            try {
-                val mediaItem = MediaItem.fromUri(currentStation.streamUrl)
-                player.setMediaItem(mediaItem)
-                player.prepare()
-                player.play()
-            } catch (e: Exception) {
-                Timber.e("Failed to prepare media source: ${e.message}")
-                Log.e("PlayerActivity", "Failed to prepare media source: ${e.message}", e)
-                loadingIndicator.visibility = View.GONE
-                bufferingText.visibility = View.GONE
-                showErrorSnackbar("Failed to prepare stream: ${e.message}")
-            }
-
-            playPauseButton.setOnClickListener {
-                if (isPlaying) {
-                    player.pause()
-                } else {
-                    player.play()
-                }
-            }
-
-            prevButton.setOnClickListener {
-                if (currentStationIndex > 0) {
-                    currentStationIndex--
-                    updateUI(stations[currentStationIndex])
-                    switchStation()
-                }
-            }
-
-            nextButton.setOnClickListener {
-                if (currentStationIndex < stations.size - 1) {
-                    currentStationIndex++
-                    updateUI(stations[currentStationIndex])
-                    switchStation()
-                }
-            }
-
-            favoriteIcon.setOnClickListener {
-                currentStation.isFavorite = !currentStation.isFavorite
-                favoriteIcon.setImageResource(
-                    if (currentStation.isFavorite) R.drawable.ic_star_filled else R.drawable.ic_star_outline
-                )
-                sharedPreferences.edit()
-                    .putBoolean(currentStation.name, currentStation.isFavorite)
-                    .apply()
-                Log.d("PlayerActivity", "Favorite toggled for ${currentStation.name}: ${currentStation.isFavorite}")
-                setResult(RESULT_OK) // Notify MainActivity to refresh
-            }
+            val mediaItem = MediaItem.fromUri(currentStation.streamUrl)
+            player.setMediaItem(mediaItem)
+            player.prepare()
+            player.play()
         } catch (e: Exception) {
-            Log.e("PlayerActivity", "Error in onCreate: ${e.message}", e)
+            loadingIndicator.visibility = View.GONE
+            bufferingText.visibility = View.GONE
             Snackbar.make(
-                findViewById(android.R.id.content),
-                "Error starting player: ${e.message}",
+                findViewById(R.id.control_layout),
+                "Failed to prepare stream: ${e.message}",
                 Snackbar.LENGTH_LONG
             ).show()
-            finish()
+        }
+
+        playPauseButton.setOnClickListener {
+            if (isPlaying) {
+                player.pause()
+                val intent = Intent(this, PlaybackService::class.java).apply {
+                    action = "PAUSE"
+                }
+                startService(intent)
+            } else {
+                player.play()
+                val intent = Intent(this, PlaybackService::class.java).apply {
+                    action = "PLAY"
+                }
+                startService(intent)
+            }
+        }
+
+        prevButton.setOnClickListener {
+            if (currentStationIndex > 0) {
+                currentStationIndex--
+                updateUI(stations[currentStationIndex])
+                switchStation()
+                val intent = Intent(this, PlaybackService::class.java).apply {
+                    action = "PREVIOUS"
+                }
+                startService(intent)
+            }
+        }
+
+        nextButton.setOnClickListener {
+            if (currentStationIndex < stations.size - 1) {
+                currentStationIndex++
+                updateUI(stations[currentStationIndex])
+                switchStation()
+                val intent = Intent(this, PlaybackService::class.java).apply {
+                    action = "NEXT"
+                }
+                startService(intent)
+            }
+        }
+
+        favoriteIcon.setOnClickListener {
+            currentStation.isFavorite = !currentStation.isFavorite
+            favoriteIcon.setImageResource(
+                if (currentStation.isFavorite) R.drawable.ic_star_filled else R.drawable.ic_star_outline
+            )
+            sharedPreferences.edit()
+                .putBoolean(currentStation.name, currentStation.isFavorite)
+                .apply()
+            setResult(RESULT_OK)
         }
     }
 
     private fun updateUI(station: Station) {
-        Log.d("PlayerActivity", "Updating UI for station: ${station.name}")
         findViewById<TextView>(R.id.station_name).text = station.name
         findViewById<TextView>(R.id.station_subtext).text = station.name
 
@@ -251,32 +252,14 @@ class PlayerActivity : AppCompatActivity() {
                 player.play()
             }
         } catch (e: Exception) {
-            Timber.e("Failed to switch station: ${e.message}")
-            Log.e("PlayerActivity", "Failed to switch station: ${e.message}", e)
             loadingIndicator.visibility = View.GONE
             bufferingText.visibility = View.GONE
-            showErrorSnackbar("Failed to switch station: ${e.message}")
+            Snackbar.make(
+                findViewById(R.id.control_layout),
+                "Failed to switch station: ${e.message}",
+                Snackbar.LENGTH_LONG
+            ).show()
         }
-    }
-
-    private fun showErrorSnackbar(message: String) {
-        Snackbar.make(
-            findViewById(R.id.control_layout),
-            message,
-            Snackbar.LENGTH_LONG
-        ).setAction("Retry") {
-            try {
-                val mediaItem = MediaItem.fromUri(stations[currentStationIndex].streamUrl)
-                player.setMediaItem(mediaItem)
-                player.prepare()
-                if (isPlaying) {
-                    player.play()
-                }
-            } catch (e: Exception) {
-                Timber.e("Retry failed: ${e.message}")
-                Log.e("PlayerActivity", "Retry failed: ${e.message}", e)
-            }
-        }.show()
     }
 
     override fun onDestroy() {

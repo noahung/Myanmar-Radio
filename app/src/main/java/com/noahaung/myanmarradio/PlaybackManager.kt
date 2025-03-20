@@ -1,82 +1,51 @@
 package com.noahaung.myanmarradio
 
 import android.content.Context
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultDataSource
+import android.content.Intent
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.common.Player
 
 object PlaybackManager {
-    private var player: ExoPlayer? = null
+    private lateinit var player: ExoPlayer
     private var currentStation: Station? = null
-    private var isPlaying: Boolean = false
-    private var listeners: MutableList<Player.Listener> = mutableListOf()
+    private var stations: ArrayList<Station>? = null
+    private lateinit var context: Context
 
     fun initialize(context: Context) {
-        if (player == null) {
-            val dataSourceFactory = DefaultDataSource.Factory(context)
-            player = ExoPlayer.Builder(context)
-                .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
-                .build()
-            player?.addListener(object : Player.Listener {
-                override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                    isPlaying = playWhenReady
-                    notifyListeners()
-                }
-
-                override fun onPlaybackStateChanged(state: Int) {
-                    notifyListeners()
-                }
-            })
-        }
+        this.context = context
+        player = ExoPlayer.Builder(context).build()
     }
 
-    fun getPlayer(): ExoPlayer {
-        return player ?: throw IllegalStateException("Player not initialized")
-    }
+    fun getPlayer(): ExoPlayer = player
 
     fun setCurrentStation(station: Station) {
         currentStation = station
-        try {
-            val mediaItem = MediaItem.fromUri(station.streamUrl)
-            player?.setMediaItem(mediaItem)
-            player?.prepare()
-        } catch (e: Exception) {
-            // Handle error if needed
+        // Start the PlaybackService when a station is set
+        val intent = Intent(context, PlaybackService::class.java).apply {
+            action = "PLAY"
         }
+        context.startService(intent)
     }
 
-    fun getCurrentStation(): Station? {
-        return currentStation
+    fun getCurrentStation(): Station? = currentStation
+
+    fun setStations(stations: ArrayList<Station>) {
+        this.stations = stations
     }
 
-    fun isPlaying(): Boolean {
-        return isPlaying
-    }
+    fun getStations(): ArrayList<Station> = stations ?: arrayListOf()
+
+    fun isPlaying(): Boolean = player.isPlaying
 
     fun addListener(listener: Player.Listener) {
-        listeners.add(listener)
-        player?.addListener(listener)
+        player.addListener(listener)
     }
 
     fun removeListener(listener: Player.Listener) {
-        listeners.remove(listener)
-        player?.removeListener(listener)
-    }
-
-    private fun notifyListeners() {
-        listeners.forEach { listener ->
-            listener.onPlayWhenReadyChanged(isPlaying, 0)
-            listener.onPlaybackStateChanged(player?.playbackState ?: Player.STATE_IDLE)
-        }
+        player.removeListener(listener)
     }
 
     fun release() {
-        player?.release()
-        player = null
-        currentStation = null
-        isPlaying = false
-        listeners.clear()
+        player.release()
     }
 }
