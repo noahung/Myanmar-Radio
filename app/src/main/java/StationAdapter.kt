@@ -14,8 +14,7 @@ import com.bumptech.glide.Glide
 class StationAdapter(
     private val context: Context,
     private val allStations: ArrayList<Station>,
-    private val onStationClick: (Station) -> Unit,
-    private val onFavoriteChanged: () -> Unit = {} // Add callback for favorite changes
+    private val onStationClick: (Station) -> Unit
 ) : RecyclerView.Adapter<StationAdapter.StationViewHolder>() {
 
     private var filteredStations: List<Station> = allStations
@@ -74,7 +73,8 @@ class StationAdapter(
                     .putBoolean(station.name, station.isFavorite)
                     .apply()
                 Log.d("StationAdapter", "Favorite toggled for ${station.name}: ${station.isFavorite}")
-                onFavoriteChanged() // Notify MainActivity to refresh the Favorites tab
+                // Notify the adapter to refresh the UI
+                notifyDataSetChanged()
             }
 
             itemView.setOnClickListener { onStationClick(station) }

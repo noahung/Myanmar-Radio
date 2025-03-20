@@ -6,5 +6,5 @@ data class Station(
     val name: String,
     val streamUrl: String,
     val imageResId: Int,
-    var isFavorite: Boolean = false // Add this property
+    var isFavorite: Boolean = false
 ) : Serializable

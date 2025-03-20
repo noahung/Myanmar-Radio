@@ -167,20 +167,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun refreshFragments() { // Changed from private to public
-        Log.d("MainActivity", "Refreshing fragments")
-        val fragments = supportFragmentManager.fragments
-        fragments.forEach { fragment ->
-            if (fragment is StationListFragment) {
-                fragment.refresh()
-            }
-        }
-    }
-
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         Log.d("MainActivity", "onActivityResult called, resultCode: $resultCode")
-        refreshFragments()
+        // Refresh the Favorites tab when returning from PlayerActivity
+        val fragments = supportFragmentManager.fragments
+        fragments.forEach { fragment ->
+            if (fragment is StationListFragment) {
+                Log.d("MainActivity", "Refreshing fragment")
+                fragment.refresh()
+            }
+        }
     }
 
     override fun onDestroy() {
