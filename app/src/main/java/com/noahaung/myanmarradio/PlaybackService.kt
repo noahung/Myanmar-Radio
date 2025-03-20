@@ -7,8 +7,6 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.Canvas // Added import
-import android.graphics.Color // Added import
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -16,6 +14,8 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import com.bumptech.glide.Glide
+import android.graphics.Canvas
+import android.graphics.Color
 
 class PlaybackService : Service() {
 
@@ -48,7 +48,7 @@ class PlaybackService : Service() {
                 android.util.Log.d("PlaybackService", "onPlaybackStateChanged: state=$state")
                 updateNotification() // Update the notification when playback state changes
                 if (state == Player.STATE_ENDED || state == Player.STATE_IDLE) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopForeground(STOP_FOREGROUND_REMOVE) // Updated to use the new method
                     stopSelf()
                 }
             }
@@ -135,7 +135,7 @@ class PlaybackService : Service() {
 
     private fun updateNotification() {
         if (currentStation == null) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopForeground(STOP_FOREGROUND_REMOVE) // Updated to use the new method
             return
         }
 
@@ -204,24 +204,24 @@ class PlaybackService : Service() {
             .setOngoing(true) // Make the notification ongoing (cannot be swiped away)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .addAction(
-                R.drawable.ic_prev, // Ensure this resource exists
+                R.drawable.ic_prev, // Add a previous icon to your drawable resources
                 "Previous",
                 previousPendingIntent
             )
             .addAction(
-                if (player.isPlaying) R.drawable.ic_pause else R.drawable.ic_play, // Ensure these resources exist
+                if (player.isPlaying) R.drawable.ic_pause else R.drawable.ic_play, // Add play/pause icons
                 if (player.isPlaying) "Pause" else "Play",
                 playPausePendingIntent
             )
             .addAction(
-                R.drawable.ic_next, // Ensure this resource exists
+                R.drawable.ic_next, // Add a next icon to your drawable resources
                 "Next",
                 nextPendingIntent
             )
             .setStyle(
                 androidx.media.app.NotificationCompat.MediaStyle()
                     .setShowActionsInCompactView(0, 1, 2) // Show all actions in compact view
-                // Removed setMediaSession for now to avoid dependency issues
+                    .setMediaSession(mediaSession.sessionCompatToken) // Link to MediaSession for lock screen controls
             )
             .build()
 

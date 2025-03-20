@@ -50,6 +50,18 @@ class StationListFragment : Fragment() {
 
         adapter = StationAdapter(requireContext(), ArrayList(filteredStations)) { station ->
             try {
+                // Set the current station in PlaybackManager
+                PlaybackManager.setCurrentStation(station)
+                android.util.Log.d("StationListFragment", "onStationClicked: Set current station: ${station.name}")
+
+                // Start the PlaybackService with the PLAY action
+                val serviceIntent = Intent(context, PlaybackService::class.java).apply {
+                    action = "PLAY"
+                }
+                requireContext().startService(serviceIntent)
+                android.util.Log.d("StationListFragment", "onStationClicked: Started PlaybackService with PLAY action")
+
+                // Navigate to PlayerActivity
                 val index = stations.indexOf(station)
                 if (index == -1) {
                     Snackbar.make(view, "Station not found!", Snackbar.LENGTH_SHORT).show()
@@ -85,6 +97,18 @@ class StationListFragment : Fragment() {
         }
         adapter = StationAdapter(requireContext(), ArrayList(filteredStations)) { station ->
             try {
+                // Set the current station in PlaybackManager
+                PlaybackManager.setCurrentStation(station)
+                android.util.Log.d("StationListFragment", "onStationClicked (filter): Set current station: ${station.name}")
+
+                // Start the PlaybackService with the PLAY action
+                val serviceIntent = Intent(context, PlaybackService::class.java).apply {
+                    action = "PLAY"
+                }
+                requireContext().startService(serviceIntent)
+                android.util.Log.d("StationListFragment", "onStationClicked (filter): Started PlaybackService with PLAY action")
+
+                // Navigate to PlayerActivity
                 val index = stations.indexOf(station)
                 if (index == -1) {
                     Snackbar.make(requireView(), "Station not found!", Snackbar.LENGTH_SHORT).show()
@@ -118,6 +142,18 @@ class StationListFragment : Fragment() {
         }
         adapter = StationAdapter(requireContext(), ArrayList(filteredStations)) { station ->
             try {
+                // Set the current station in PlaybackManager
+                PlaybackManager.setCurrentStation(station)
+                android.util.Log.d("StationListFragment", "onStationClicked (refresh): Set current station: ${station.name}")
+
+                // Start the PlaybackService with the PLAY action
+                val serviceIntent = Intent(context, PlaybackService::class.java).apply {
+                    action = "PLAY"
+                }
+                requireContext().startService(serviceIntent)
+                android.util.Log.d("StationListFragment", "onStationClicked (refresh): Started PlaybackService with PLAY action")
+
+                // Navigate to PlayerActivity
                 val index = stations.indexOf(station)
                 if (index == -1) {
                     Snackbar.make(requireView(), "Station not found!", Snackbar.LENGTH_SHORT).show()
