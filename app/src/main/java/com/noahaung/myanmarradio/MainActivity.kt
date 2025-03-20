@@ -1,6 +1,7 @@
 package com.noahaung.myanmarradio
 
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -8,18 +9,21 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SearchView
 import androidx.media3.common.Player
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
 import com.bumptech.glide.Glide
+import com.google.android.material.tabs.TabLayout
+import com.google.android.material.tabs.TabLayoutMediator
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var recyclerView: RecyclerView
     private lateinit var miniPlayerContainer: View
     private lateinit var miniPlayerStationName: TextView
     private lateinit var miniPlayerPlayPause: ImageButton
     private lateinit var miniPlayerImage: ImageView
-    private lateinit var stations: List<Station> // Store stations for navigation
+    private lateinit var stations: ArrayList<Station>
+    private lateinit var sharedPreferences: SharedPreferences
+    private lateinit var viewPager: ViewPager2
 
     private val playerListener = object : Player.Listener {
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -35,10 +39,11 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Initialize PlaybackManager
         PlaybackManager.initialize(this)
 
-        stations = listOf(
+        sharedPreferences = getSharedPreferences("favorites", MODE_PRIVATE)
+
+        stations = arrayListOf(
             Station("Friends FM", "https://stream-172.zeno.fm/rtt1xsez338uv", R.drawable.friends_fm),
             Station("City FM", "https://stream.zeno.fm/rq4ux25pyeruv", R.drawable.city_fm),
             Station("Shwe Ayeyar FM", "https://stream.zeno.fm/gvyz1utf4uhvv", R.drawable.shwe_ayeyar_fm),
@@ -79,27 +84,45 @@ class MainActivity : AppCompatActivity() {
             Station("karomeanchlorine FM", "https://stream-163.zeno.fm/dm7nzm5m5a0uv", R.drawable.karomeanchlorine_fm),
             Station("Mandalay FM", "https://edge.mixlr.com/channel/nmtev", R.drawable.mandalay_fm),
             Station("Carrot FM", "https://stream-169.zeno.fm/sbhdc0yqkprvv", R.drawable.carrot_fm)
-        )
+        ).map { station ->
+            station.isFavorite = sharedPreferences.getBoolean(station.name, false)
+            station
+        } as ArrayList<Station>
 
-        recyclerView = findViewById(R.id.station_list)
-        recyclerView.layoutManager = GridLayoutManager(this, 2) // Changed to 2 columns
-        recyclerView.addItemDecoration(GridSpacingItemDecoration(2, 24, true)) // Updated spanCount to 2
-        recyclerView.adapter = StationAdapter(stations) { station ->
-            val index = stations.indexOf(station)
-            val intent = Intent(this, PlayerActivity::class.java).apply {
-                putExtra("STATION_INDEX", index)
-                putExtra("STATION_LIST", ArrayList(stations))
+        viewPager = findViewById(R.id.view_pager)
+        viewPager.adapter = ViewPagerAdapter(this)
+
+        val tabLayout = findViewById<TabLayout>(R.id.tab_layout)
+        TabLayoutMediator(tabLayout, viewPager) { tab, position ->
+            tab.text = when (position) {
+                0 -> "All Stations"
+                1 -> "Favorites"
+                else -> null
             }
-            startActivity(intent)
-        }
+        }.attach()
 
-        // Initialize mini-player views
+        val searchView = findViewById<SearchView>(R.id.search_view)
+        searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                return false
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                val fragments = supportFragmentManager.fragments
+                fragments.forEach { fragment ->
+                    if (fragment is StationListFragment) {
+                        fragment.filter(newText ?: "")
+                    }
+                }
+                return true
+            }
+        })
+
         miniPlayerContainer = findViewById(R.id.mini_player_container)
         miniPlayerStationName = findViewById(R.id.mini_player_station_name)
         miniPlayerPlayPause = findViewById(R.id.mini_player_play_pause)
         miniPlayerImage = findViewById(R.id.mini_player_image)
 
-        // Set up mini-player play/pause button
         miniPlayerPlayPause.setOnClickListener {
             if (PlaybackManager.isPlaying()) {
                 PlaybackManager.getPlayer().pause()
@@ -108,7 +131,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Navigate to PlayerActivity when mini-player is clicked
         miniPlayerContainer.setOnClickListener {
             val currentStation = PlaybackManager.getCurrentStation()
             if (currentStation != null) {
@@ -116,17 +138,18 @@ class MainActivity : AppCompatActivity() {
                 if (index != -1) {
                     val intent = Intent(this, PlayerActivity::class.java).apply {
                         putExtra("STATION_INDEX", index)
-                        putExtra("STATION_LIST", ArrayList(stations))
+                        putExtra("STATION_LIST", stations)
                     }
                     startActivity(intent)
                 }
             }
         }
 
-        // Add listener to update mini-player
         PlaybackManager.addListener(playerListener)
         updateMiniPlayer()
     }
+
+    fun getStations(): ArrayList<Station> = stations
 
     private fun updateMiniPlayer() {
         val currentStation = PlaybackManager.getCurrentStation()
@@ -142,6 +165,22 @@ class MainActivity : AppCompatActivity() {
         } else {
             miniPlayerContainer.visibility = View.GONE
         }
+    }
+
+    fun refreshFragments() { // Changed from private to public
+        Log.d("MainActivity", "Refreshing fragments")
+        val fragments = supportFragmentManager.fragments
+        fragments.forEach { fragment ->
+            if (fragment is StationListFragment) {
+                fragment.refresh()
+            }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        Log.d("MainActivity", "onActivityResult called, resultCode: $resultCode")
+        refreshFragments()
     }
 
     override fun onDestroy() {
