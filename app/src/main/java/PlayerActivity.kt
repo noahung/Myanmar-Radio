@@ -9,7 +9,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.Player
 import com.bumptech.glide.Glide
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import android.app.AlertDialog
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -180,44 +180,27 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun showSleepTimerDialog() {
-        val durations = arrayOf("15 minutes", "30 minutes", "45 minutes", "1 hour", "Custom")
-        val durationValues = longArrayOf(15 * 60 * 1000L, 30 * 60 * 1000L, 45 * 60 * 1000L, 60 * 60 * 1000L, 0L)
+        val durations = arrayOf("15 minutes", "30 minutes", "45 minutes", "1 hour", "1.5 hours", "2 hours")
+        val durationValues = longArrayOf(
+            15 * 60 * 1000L,  // 15 minutes
+            30 * 60 * 1000L,  // 30 minutes
+            45 * 60 * 1000L,  // 45 minutes
+            60 * 60 * 1000L,  // 1 hour
+            90 * 60 * 1000L,  // 1.5 hours
+            120 * 60 * 1000L  // 2 hours
+        )
 
-        MaterialAlertDialogBuilder(this)
+        AlertDialog.Builder(this)
             .setTitle("Set Sleep Timer")
             .setItems(durations) { _, which ->
-                if (durations[which] == "Custom") {
-                    showCustomDurationDialog()
-                } else {
-                    val duration = durationValues[which]
-                    startSleepTimer(duration)
-                }
+                val duration = durationValues[which]
+                startSleepTimer(duration)
             }
             .setNegativeButton("Cancel") { dialog, _ ->
                 dialog.dismiss()
             }
             .setPositiveButton(if (isSleepTimerActive) "Stop Timer" else null) { _, _ ->
                 stopSleepTimer()
-            }
-            .show()
-    }
-
-    private fun showCustomDurationDialog() {
-        val customView = layoutInflater.inflate(R.layout.dialog_sleep_timer, null)
-        val minutesInput: TextView = customView.findViewById(R.id.minutes_input)
-
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Custom Sleep Timer")
-            .setView(customView)
-            .setPositiveButton("Set") { _, _ ->
-                val minutes = minutesInput.text.toString().toLongOrNull() ?: 0L
-                if (minutes > 0) {
-                    val duration = minutes * 60 * 1000L
-                    startSleepTimer(duration)
-                }
-            }
-            .setNegativeButton("Cancel") { dialog, _ ->
-                dialog.dismiss()
             }
             .show()
     }
