@@ -10,6 +10,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.Player
 import com.bumptech.glide.Glide
 import android.app.AlertDialog
+import android.widget.ArrayAdapter
+import android.widget.ListView
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -29,6 +31,7 @@ class PlayerActivity : AppCompatActivity() {
     private var stationIndex: Int = 0
     private var sleepTimer: CountDownTimer? = null
     private var isSleepTimerActive: Boolean = false
+    private var remainingTimeMillis: Long = 0
 
     private val playerListener = object : Player.Listener {
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -100,7 +103,7 @@ class PlayerActivity : AppCompatActivity() {
                 val station = stations[stationIndex]
                 PlaybackManager.setCurrentStation(station)
                 val intent = Intent(this, PlaybackService::class.java).apply {
-                    action = "PREVIOUS"
+                    action = "PREPREVIOUSE"
                 }
                 startService(intent)
                 updateUI(station)
@@ -179,6 +182,14 @@ class PlayerActivity : AppCompatActivity() {
         )
     }
 
+    private fun updateSleepTimerIcon() {
+        if (isSleepTimerActive) {
+            sleepTimerButton.setColorFilter(android.graphics.Color.YELLOW)
+        } else {
+            sleepTimerButton.clearColorFilter()
+        }
+    }
+
     private fun showSleepTimerDialog() {
         val durations = arrayOf("15 minutes", "30 minutes", "45 minutes", "1 hour", "1.5 hours", "2 hours")
         val durationValues = longArrayOf(
@@ -190,26 +201,51 @@ class PlayerActivity : AppCompatActivity() {
             120 * 60 * 1000L  // 2 hours
         )
 
-        AlertDialog.Builder(this)
-            .setTitle("Set Sleep Timer")
-            .setItems(durations) { _, which ->
-                val duration = durationValues[which]
-                startSleepTimer(duration)
-            }
+        val dialogView = layoutInflater.inflate(R.layout.dialog_sleep_timer_list, null)
+        val headerText = dialogView.findViewById<TextView>(R.id.sleep_timer_header)
+        val listView = dialogView.findViewById<ListView>(R.id.sleep_timer_list)
+
+        // Set header text
+        if (isSleepTimerActive) {
+            val minutesLeft = (remainingTimeMillis / 1000 / 60).toInt()
+            headerText.text = "Sleep timer - $minutesLeft min left"
+        } else {
+            headerText.text = "Set Sleep Timer"
+        }
+
+        // Set up the list
+        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, durations).apply {
+            // Customize text color to white
+            setDropDownViewResource(android.R.layout.simple_list_item_1)
+        }
+        listView.adapter = adapter
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
             .setNegativeButton("Cancel") { dialog, _ ->
                 dialog.dismiss()
             }
-            .setPositiveButton(if (isSleepTimerActive) "Stop Timer" else null) { _, _ ->
+            .setPositiveButton(if (isSleepTimerActive) "Turn off timer" else null) { _, _ ->
                 stopSleepTimer()
+                updateSleepTimerIcon()
             }
-            .show()
+            .create()
+
+        listView.setOnItemClickListener { _, _, position, _ ->
+            val duration = durationValues[position]
+            startSleepTimer(duration)
+            updateSleepTimerIcon()
+            dialog.dismiss()
+        }
+
+        dialog.show()
     }
 
     private fun startSleepTimer(duration: Long) {
         stopSleepTimer()
         sleepTimer = object : CountDownTimer(duration, 1000) {
             override fun onTick(millisUntilFinished: Long) {
-                // Optionally update UI with remaining time
+                remainingTimeMillis = millisUntilFinished
             }
 
             override fun onFinish() {
@@ -219,15 +255,18 @@ class PlayerActivity : AppCompatActivity() {
                 }
                 startService(intent)
                 isSleepTimerActive = false
+                updateSleepTimerIcon()
             }
         }.start()
         isSleepTimerActive = true
+        remainingTimeMillis = duration
     }
 
     private fun stopSleepTimer() {
         sleepTimer?.cancel()
         sleepTimer = null
         isSleepTimerActive = false
+        remainingTimeMillis = 0
     }
 
     override fun onDestroy() {
