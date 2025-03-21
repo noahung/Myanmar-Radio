@@ -9,7 +9,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.Player
 import com.bumptech.glide.Glide
-import android.app.AlertDialog
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import android.widget.ArrayAdapter
 import android.widget.ListView
 
@@ -103,7 +103,7 @@ class PlayerActivity : AppCompatActivity() {
                 val station = stations[stationIndex]
                 PlaybackManager.setCurrentStation(station)
                 val intent = Intent(this, PlaybackService::class.java).apply {
-                    action = "PREPREVIOUSE"
+                    action = "PREVIOUS"
                 }
                 startService(intent)
                 updateUI(station)
@@ -191,7 +191,11 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun showSleepTimerDialog() {
-        val durations = arrayOf("15 minutes", "30 minutes", "45 minutes", "1 hour", "1.5 hours", "2 hours")
+        val durations = if (isSleepTimerActive) {
+            arrayOf("15 minutes", "30 minutes", "45 minutes", "1 hour", "1.5 hours", "2 hours", "Turn off timer")
+        } else {
+            arrayOf("15 minutes", "30 minutes", "45 minutes", "1 hour", "1.5 hours", "2 hours")
+        }
         val durationValues = longArrayOf(
             15 * 60 * 1000L,  // 15 minutes
             30 * 60 * 1000L,  // 30 minutes
@@ -215,30 +219,26 @@ class PlayerActivity : AppCompatActivity() {
 
         // Set up the list
         val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, durations).apply {
-            // Customize text color to white
             setDropDownViewResource(android.R.layout.simple_list_item_1)
         }
         listView.adapter = adapter
 
-        val dialog = AlertDialog.Builder(this)
-            .setView(dialogView)
-            .setNegativeButton("Cancel") { dialog, _ ->
-                dialog.dismiss()
-            }
-            .setPositiveButton(if (isSleepTimerActive) "Turn off timer" else null) { _, _ ->
-                stopSleepTimer()
-                updateSleepTimerIcon()
-            }
-            .create()
+        val dialog = BottomSheetDialog(this)
+        dialog.setContentView(dialogView)
+        dialog.show()
 
         listView.setOnItemClickListener { _, _, position, _ ->
-            val duration = durationValues[position]
-            startSleepTimer(duration)
-            updateSleepTimerIcon()
+            if (isSleepTimerActive && position == durations.size - 1) {
+                // "Turn off timer" was clicked
+                stopSleepTimer()
+                updateSleepTimerIcon()
+            } else {
+                val duration = durationValues[position]
+                startSleepTimer(duration)
+                updateSleepTimerIcon()
+            }
             dialog.dismiss()
         }
-
-        dialog.show()
     }
 
     private fun startSleepTimer(duration: Long) {

@@ -3,7 +3,9 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="#2A2A2A">
+    android:background="@drawable/rounded_top_dialog_background"
+    android:clipToPadding="false"
+    android:clipChildren="false">
 
     <TextView
         android:id="@+id/sleep_timer_header"
@@ -20,7 +22,8 @@
         android:id="@+id/sleep_timer_list"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#2A2A2A"
-        android:divider="#1C2526"
-        android:dividerHeight="1dp" />
+        android:background="#1C2526"
+        android:divider="#2A2A2A"
+        android:dividerHeight="1dp"
+        android:paddingBottom="16dp" />
 </LinearLayout>
