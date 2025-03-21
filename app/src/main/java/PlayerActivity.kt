@@ -1,117 +1,48 @@
 package com.noahaung.myanmarradio
 
 import android.content.Intent
-import android.content.SharedPreferences
 import android.os.Bundle
-import android.view.View
+import android.os.CountDownTimer
 import android.widget.ImageButton
 import android.widget.ImageView
-import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
 import com.bumptech.glide.Glide
-import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class PlayerActivity : AppCompatActivity() {
-    private lateinit var player: ExoPlayer
-    private var isPlaying = false
+
+    private lateinit var currentStationImage: ImageView
+    private lateinit var prevStationImage: ImageView
+    private lateinit var nextStationImage: ImageView
+    private lateinit var stationName: TextView
+    private lateinit var stationSubtext: TextView
     private lateinit var playPauseButton: ImageButton
-    private lateinit var loadingIndicator: ProgressBar
+    private lateinit var prevButton: ImageButton
+    private lateinit var nextButton: ImageButton
+    private lateinit var favoriteButton: ImageButton
+    private lateinit var sleepTimerButton: ImageButton
+    private lateinit var loadingIndicator: android.widget.ProgressBar
     private lateinit var bufferingText: TextView
     private lateinit var stations: ArrayList<Station>
-    private var currentStationIndex: Int = 0
-    private lateinit var soundWaveView: SoundWaveView
-    private lateinit var favoriteIcon: ImageView
-    private lateinit var sharedPreferences: SharedPreferences
+    private var stationIndex: Int = 0
+    private var sleepTimer: CountDownTimer? = null
+    private var isSleepTimerActive: Boolean = false
 
     private val playerListener = object : Player.Listener {
-        override fun onPlayerError(error: PlaybackException) {
-            loadingIndicator.visibility = View.GONE
-            bufferingText.visibility = View.GONE
-            soundWaveView.setPlaying(false)
-            isPlaying = false
-            playPauseButton.setImageResource(R.drawable.ic_play)
-
-            val errorMessage = when {
-                error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
-                        error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> {
-                    "Failed to load stream. Please check your network connection."
-                }
-                error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED -> {
-                    "An unexpected error occurred while playing the stream."
-                }
-                else -> {
-                    "An error occurred: ${error.message}"
-                }
-            }
-
-            Snackbar.make(
-                findViewById(R.id.control_layout),
-                errorMessage,
-                Snackbar.LENGTH_LONG
-            ).setAction("Retry") {
-                try {
-                    val mediaItem = MediaItem.fromUri(stations[currentStationIndex].streamUrl)
-                    player.setMediaItem(mediaItem)
-                    player.prepare()
-                    if (isPlaying) {
-                        player.play()
-                    }
-                } catch (e: Exception) {
-                    Snackbar.make(
-                        findViewById(R.id.control_layout),
-                        "Retry failed: ${e.message}",
-                        Snackbar.LENGTH_LONG
-                    ).show()
-                }
-            }.show()
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            updatePlayPauseButton()
         }
 
         override fun onPlaybackStateChanged(state: Int) {
-            when (state) {
-                Player.STATE_BUFFERING -> {
-                    loadingIndicator.visibility = View.VISIBLE
-                    bufferingText.visibility = View.VISIBLE
-                    soundWaveView.setPlaying(false)
-                }
-                Player.STATE_READY -> {
-                    loadingIndicator.visibility = View.GONE
-                    bufferingText.visibility = View.GONE
-                    if (player.playWhenReady) {
-                        isPlaying = true
-                        playPauseButton.setImageResource(R.drawable.ic_pause)
-                        soundWaveView.setPlaying(true)
-                    } else {
-                        isPlaying = false
-                        playPauseButton.setImageResource(R.drawable.ic_play)
-                        soundWaveView.setPlaying(false)
-                    }
-                }
-                Player.STATE_ENDED, Player.STATE_IDLE -> {
-                    loadingIndicator.visibility = View.GONE
-                    bufferingText.visibility = View.GONE
-                    isPlaying = false
-                    playPauseButton.setImageResource(R.drawable.ic_play)
-                    soundWaveView.setPlaying(false)
-                }
-            }
-        }
-
-        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-            if (playWhenReady && player.playbackState == Player.STATE_READY) {
-                isPlaying = true
-                playPauseButton.setImageResource(R.drawable.ic_pause)
-                soundWaveView.setPlaying(true)
-                loadingIndicator.visibility = View.GONE
-                bufferingText.visibility = View.GONE
+            updatePlayPauseButton()
+            if (state == Player.STATE_BUFFERING) {
+                loadingIndicator.visibility = android.view.View.VISIBLE
+                bufferingText.visibility = android.view.View.VISIBLE
             } else {
-                isPlaying = false
-                playPauseButton.setImageResource(R.drawable.ic_play)
-                soundWaveView.setPlaying(false)
+                loadingIndicator.visibility = android.view.View.GONE
+                bufferingText.visibility = android.view.View.GONE
             }
         }
     }
@@ -120,61 +51,42 @@ class PlayerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
 
-        sharedPreferences = getSharedPreferences("favorites", MODE_PRIVATE)
-
-        currentStationIndex = intent.getIntExtra("STATION_INDEX", 0)
-        @Suppress("DEPRECATION")
-        stations = intent.getSerializableExtra("STATION_LIST") as? ArrayList<Station>
-            ?: throw IllegalStateException("Station list not found in intent")
-
-        if (currentStationIndex < 0 || currentStationIndex >= stations.size) {
-            throw IllegalStateException("Invalid station index: $currentStationIndex")
-        }
-
+        currentStationImage = findViewById(R.id.current_station_image)
+        prevStationImage = findViewById(R.id.prev_station_image)
+        nextStationImage = findViewById(R.id.next_station_image)
+        stationName = findViewById(R.id.station_name)
+        stationSubtext = findViewById(R.id.station_subtext)
         playPauseButton = findViewById(R.id.play_pause_button)
-        val prevButton = findViewById<ImageButton>(R.id.prev_button)
-        val nextButton = findViewById<ImageButton>(R.id.next_button)
-        val backButton = findViewById<ImageButton>(R.id.back_button)
-        soundWaveView = findViewById(R.id.soundwave_view)
+        prevButton = findViewById(R.id.prev_button)
+        nextButton = findViewById(R.id.next_button)
+        favoriteButton = findViewById(R.id.favorite_button)
+        sleepTimerButton = findViewById(R.id.sleep_timer_button)
         loadingIndicator = findViewById(R.id.loading_indicator)
         bufferingText = findViewById(R.id.buffering_text)
-        favoriteIcon = findViewById(R.id.favorite_icon_player)
 
-        val currentStation = stations[currentStationIndex]
-        updateUI(currentStation)
+        stations = intent.getSerializableExtra("STATION_LIST") as ArrayList<Station>
+        stationIndex = intent.getIntExtra("STATION_INDEX", 0)
 
-        backButton.setOnClickListener {
+        if (stations.isNotEmpty() && stationIndex in stations.indices) {
+            val station = stations[stationIndex]
+            updateUI(station)
+            updateFavoriteButton(station)
+            updateAdjacentStations()
+        }
+
+        findViewById<ImageButton>(R.id.back_button).setOnClickListener {
             finish()
         }
 
-        player = PlaybackManager.getPlayer()
-        PlaybackManager.setCurrentStation(currentStation)
-        PlaybackManager.addListener(playerListener)
-
-        try {
-            val mediaItem = MediaItem.fromUri(currentStation.streamUrl)
-            player.setMediaItem(mediaItem)
-            player.prepare()
-            player.play()
-        } catch (e: Exception) {
-            loadingIndicator.visibility = View.GONE
-            bufferingText.visibility = View.GONE
-            Snackbar.make(
-                findViewById(R.id.control_layout),
-                "Failed to prepare stream: ${e.message}",
-                Snackbar.LENGTH_LONG
-            ).show()
-        }
-
         playPauseButton.setOnClickListener {
-            if (isPlaying) {
-                player.pause()
+            if (PlaybackManager.isPlaying()) {
+                PlaybackManager.getPlayer().pause()
                 val intent = Intent(this, PlaybackService::class.java).apply {
                     action = "PAUSE"
                 }
                 startService(intent)
             } else {
-                player.play()
+                PlaybackManager.getPlayer().play()
                 val intent = Intent(this, PlaybackService::class.java).apply {
                     action = "PLAY"
                 }
@@ -183,87 +95,161 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         prevButton.setOnClickListener {
-            if (currentStationIndex > 0) {
-                currentStationIndex--
-                updateUI(stations[currentStationIndex])
-                switchStation()
+            if (stationIndex > 0) {
+                stationIndex--
+                val station = stations[stationIndex]
+                PlaybackManager.setCurrentStation(station)
                 val intent = Intent(this, PlaybackService::class.java).apply {
                     action = "PREVIOUS"
                 }
                 startService(intent)
+                updateUI(station)
+                updateFavoriteButton(station)
+                updateAdjacentStations()
             }
         }
 
         nextButton.setOnClickListener {
-            if (currentStationIndex < stations.size - 1) {
-                currentStationIndex++
-                updateUI(stations[currentStationIndex])
-                switchStation()
+            if (stationIndex < stations.size - 1) {
+                stationIndex++
+                val station = stations[stationIndex]
+                PlaybackManager.setCurrentStation(station)
                 val intent = Intent(this, PlaybackService::class.java).apply {
                     action = "NEXT"
                 }
                 startService(intent)
+                updateUI(station)
+                updateFavoriteButton(station)
+                updateAdjacentStations()
             }
         }
 
-        favoriteIcon.setOnClickListener {
-            currentStation.isFavorite = !currentStation.isFavorite
-            favoriteIcon.setImageResource(
-                if (currentStation.isFavorite) R.drawable.ic_star_filled else R.drawable.ic_star_outline
-            )
-            sharedPreferences.edit()
-                .putBoolean(currentStation.name, currentStation.isFavorite)
+        favoriteButton.setOnClickListener {
+            val station = stations[stationIndex]
+            station.isFavorite = !station.isFavorite
+            getSharedPreferences("favorites", MODE_PRIVATE).edit()
+                .putBoolean(station.name, station.isFavorite)
                 .apply()
-            setResult(RESULT_OK)
+            updateFavoriteButton(station)
         }
+
+        sleepTimerButton.setOnClickListener {
+            showSleepTimerDialog()
+        }
+
+        PlaybackManager.addListener(playerListener)
+        updatePlayPauseButton()
     }
 
     private fun updateUI(station: Station) {
-        findViewById<TextView>(R.id.station_name).text = station.name
-        findViewById<TextView>(R.id.station_subtext).text = station.name
-
+        stationName.text = station.name
+        stationSubtext.text = station.name
         Glide.with(this)
             .load(station.imageResId)
-            .into(findViewById(R.id.current_station_image))
+            .into(currentStationImage)
+    }
 
-        val prevIndex = if (currentStationIndex > 0) currentStationIndex - 1 else stations.size - 1
-        Glide.with(this)
-            .load(stations[prevIndex].imageResId)
-            .into(findViewById(R.id.prev_station_image))
+    private fun updateAdjacentStations() {
+        if (stationIndex > 0) {
+            Glide.with(this)
+                .load(stations[stationIndex - 1].imageResId)
+                .into(prevStationImage)
+        } else {
+            prevStationImage.setImageDrawable(null)
+        }
 
-        val nextIndex = if (currentStationIndex < stations.size - 1) currentStationIndex + 1 else 0
-        Glide.with(this)
-            .load(stations[nextIndex].imageResId)
-            .into(findViewById(R.id.next_station_image))
+        if (stationIndex < stations.size - 1) {
+            Glide.with(this)
+                .load(stations[stationIndex + 1].imageResId)
+                .into(nextStationImage)
+        } else {
+            nextStationImage.setImageDrawable(null)
+        }
+    }
 
-        favoriteIcon.setImageResource(
+    private fun updatePlayPauseButton() {
+        playPauseButton.setImageResource(
+            if (PlaybackManager.isPlaying()) R.drawable.ic_pause else R.drawable.ic_play
+        )
+    }
+
+    private fun updateFavoriteButton(station: Station) {
+        favoriteButton.setImageResource(
             if (station.isFavorite) R.drawable.ic_star_filled else R.drawable.ic_star_outline
         )
     }
 
-    private fun switchStation() {
-        val station = stations[currentStationIndex]
-        PlaybackManager.setCurrentStation(station)
-        try {
-            val mediaItem = MediaItem.fromUri(station.streamUrl)
-            player.setMediaItem(mediaItem)
-            player.prepare()
-            if (isPlaying) {
-                player.play()
+    private fun showSleepTimerDialog() {
+        val durations = arrayOf("15 minutes", "30 minutes", "45 minutes", "1 hour", "Custom")
+        val durationValues = longArrayOf(15 * 60 * 1000L, 30 * 60 * 1000L, 45 * 60 * 1000L, 60 * 60 * 1000L, 0L)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Set Sleep Timer")
+            .setItems(durations) { _, which ->
+                if (durations[which] == "Custom") {
+                    showCustomDurationDialog()
+                } else {
+                    val duration = durationValues[which]
+                    startSleepTimer(duration)
+                }
             }
-        } catch (e: Exception) {
-            loadingIndicator.visibility = View.GONE
-            bufferingText.visibility = View.GONE
-            Snackbar.make(
-                findViewById(R.id.control_layout),
-                "Failed to switch station: ${e.message}",
-                Snackbar.LENGTH_LONG
-            ).show()
-        }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .setPositiveButton(if (isSleepTimerActive) "Stop Timer" else null) { _, _ ->
+                stopSleepTimer()
+            }
+            .show()
+    }
+
+    private fun showCustomDurationDialog() {
+        val customView = layoutInflater.inflate(R.layout.dialog_sleep_timer, null)
+        val minutesInput: TextView = customView.findViewById(R.id.minutes_input)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Custom Sleep Timer")
+            .setView(customView)
+            .setPositiveButton("Set") { _, _ ->
+                val minutes = minutesInput.text.toString().toLongOrNull() ?: 0L
+                if (minutes > 0) {
+                    val duration = minutes * 60 * 1000L
+                    startSleepTimer(duration)
+                }
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun startSleepTimer(duration: Long) {
+        stopSleepTimer()
+        sleepTimer = object : CountDownTimer(duration, 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                // Optionally update UI with remaining time
+            }
+
+            override fun onFinish() {
+                PlaybackManager.getPlayer().stop()
+                val intent = Intent(this@PlayerActivity, PlaybackService::class.java).apply {
+                    action = "PAUSE"
+                }
+                startService(intent)
+                isSleepTimerActive = false
+            }
+        }.start()
+        isSleepTimerActive = true
+    }
+
+    private fun stopSleepTimer() {
+        sleepTimer?.cancel()
+        sleepTimer = null
+        isSleepTimerActive = false
     }
 
     override fun onDestroy() {
         super.onDestroy()
         PlaybackManager.removeListener(playerListener)
+        stopSleepTimer()
     }
 }

@@ -1,7 +1,6 @@
 package com.noahaung.myanmarradio
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -18,7 +17,6 @@ class StationAdapter(
 ) : RecyclerView.Adapter<StationAdapter.StationViewHolder>() {
 
     private var filteredStations: List<Station> = allStations
-    private val sharedPreferences: SharedPreferences = context.getSharedPreferences("favorites", Context.MODE_PRIVATE)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): StationViewHolder {
         Log.d("StationAdapter", "onCreateViewHolder called")
@@ -50,7 +48,6 @@ class StationAdapter(
     inner class StationViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val stationThumbnail: ImageView = itemView.findViewById(R.id.station_thumbnail)
         private val stationName: TextView = itemView.findViewById(R.id.station_name)
-        private val favoriteIcon: ImageView = itemView.findViewById(R.id.favorite_icon)
 
         fun bind(station: Station) {
             Log.d("StationAdapter", "Binding station: ${station.name}")
@@ -59,23 +56,6 @@ class StationAdapter(
                 .load(station.imageResId)
                 .placeholder(android.R.color.darker_gray)
                 .into(stationThumbnail)
-
-            favoriteIcon.setImageResource(
-                if (station.isFavorite) R.drawable.ic_star_filled else R.drawable.ic_star_outline
-            )
-
-            favoriteIcon.setOnClickListener {
-                station.isFavorite = !station.isFavorite
-                favoriteIcon.setImageResource(
-                    if (station.isFavorite) R.drawable.ic_star_filled else R.drawable.ic_star_outline
-                )
-                sharedPreferences.edit()
-                    .putBoolean(station.name, station.isFavorite)
-                    .apply()
-                Log.d("StationAdapter", "Favorite toggled for ${station.name}: ${station.isFavorite}")
-                // Notify the adapter to refresh the UI
-                notifyDataSetChanged()
-            }
 
             itemView.setOnClickListener { onStationClick(station) }
         }
